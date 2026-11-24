@@ -3,9 +3,54 @@ from lake.receipts import find_receipt, record_receipt
 from rounds.input_bindings import TileBinding, binding_matches
 from rounds.plans import get_round
 from rounds.tile_grid import resolve_tile_window
-from tiles.intersections import TileHit
+from tiles.intersections import FootprintCoverage, TileHit, ZoneExtent
 from tiles.packets import TilePacket, packet_identity, tile_source_id
 from workdb import write_database
+
+
+def _within(inner, outer):
+    return (inner.left >= outer.left and inner.bottom >= outer.bottom
+            and inner.right <= outer.right and inner.top <= outer.top)
+
+
+def _validate_coverage(packet, expected, tile_window):
+    references = set(expected.references)
+    pieces = packet.coverage
+    if not isinstance(pieces, tuple):
+        raise ValueError('测带覆盖须按规范封存')
+    seen = set()
+    for piece in pieces:
+        if not isinstance(piece, FootprintCoverage):
+            raise ValueError('封存件含无效测带覆盖')
+        if piece.footprint not in references:
+            raise ValueError('测带覆盖不在冻结来源范围内')
+        if piece.footprint in seen:
+            raise ValueError('测带覆盖含重复测带')
+        seen.add(piece.footprint)
+        if not _within(piece.bounds, tile_window.bounds):
+            raise ValueError('测带覆盖超出瓦片范围')
+    if tuple(sorted(pieces, key=lambda item: item.sort_key)) != pieces:
+        raise ValueError('测带覆盖未按规范排序')
+
+
+def _validate_zones(packet, expected, tile_window):
+    references = set(expected.references)
+    extents = packet.zones
+    if not isinstance(extents, tuple):
+        raise ValueError('巡测区范围须按规范封存')
+    seen = set()
+    for extent in extents:
+        if not isinstance(extent, ZoneExtent):
+            raise ValueError('封存件含无效巡测区范围')
+        if extent.zone not in references:
+            raise ValueError('巡测区范围不在冻结来源范围内')
+        if extent.zone in seen:
+            raise ValueError('巡测区范围含重复巡测区')
+        seen.add(extent.zone)
+        if not _within(extent.bounds, tile_window.bounds):
+            raise ValueError('巡测区范围超出瓦片范围')
+    if tuple(sorted(extents, key=lambda item: item.sort_key)) != extents:
+        raise ValueError('巡测区范围未按规范排序')
 
 
 def _validate_packet(plan, packet):
@@ -22,8 +67,9 @@ def _validate_packet(plan, packet):
         raise ValueError('封存件源件号不符')
     if not isinstance(packet.hits, tuple):
         raise ValueError('命中须按规范封存')
+    window = resolve_tile_window(expected.tile_id)
     references = set(expected.references)
-    max_area = resolve_tile_window(expected.tile_id).bounds.area
+    max_area = window.bounds.area
     keys = []
     for hit in packet.hits:
         if not isinstance(hit, TileHit):
@@ -33,6 +79,8 @@ def _validate_packet(plan, packet):
         keys.append(hit.named_key)
     if keys != sorted(set(keys)):
         raise ValueError('封存件含重复或乱序命中')
+    _validate_coverage(packet, expected, window)
+    _validate_zones(packet, expected, window)
     if packet.digest != packet_identity(packet):
         raise ValueError('封存件内容摘要不符')
 

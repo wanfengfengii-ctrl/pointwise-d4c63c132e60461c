@@ -1,10 +1,13 @@
 import argparse
 from dataclasses import asdict
+from fractions import Fraction
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from dispatch.readback import initialize_readback, read
+from dispatch.routes import HandoverPolicy, Route, plan_route, route_plan_record
+from lake.coverage import initialize_coverage
 from lake.evidence import initialize_evidence, load_round_evidence
 from lake.intake import accept_tile
 from lake.publish import publish
@@ -37,7 +40,37 @@ def initialize(lake_path, field_path):
         initialize_evidence(lake_db)
         initialize_receipts(lake_db)
         initialize_tile_support(lake_db)
+        initialize_coverage(lake_db)
         initialize_readback(lake_db)
+
+
+def route_scene(root):
+    """演示：全路几何覆盖但无法直接交班，加入中间班组后可走得更远。"""
+    lake_path, field_path = root / 'route-lake.sqlite', root / 'route-field.sqlite'
+    initialize(lake_path, field_path)
+    zone = register(field_path, 'zone', 'Z', 'r1', '河口巡测区', [0, 0, 30, 10]).ref
+    alpha = register(field_path, 'footprint', 'ALPHA', 'r1', '甲班西段实测',
+                     [0, 4, 10, 6], crew='alpha').ref
+    beta = register(field_path, 'footprint', 'BETA', 'r1', '乙班东段实测',
+                    [10, 4, 30, 6], crew='beta').ref
+    gamma = register(field_path, 'footprint', 'GAMMA', 'r1', '丙班搭接实测',
+                     [5, 4, 25, 6], crew='gamma').ref
+    open_round(lake_path, field_path, 'all-cover', 'origin', {
+        tile: (zone, alpha, beta, gamma) for tile in ('0,0', '1,0', '2,0')
+    })
+    for tile in ('0,0', '1,0', '2,0'):
+        accept_tile(lake_path, 'all-cover', seal_tile(lake_path, field_path, 'all-cover', tile))
+    version_id = publish(lake_path, 'all-cover').version_id
+    route = Route(((0, 5), (30, 5)), 'Z')
+    direct = plan_route(lake_path, version_id, route,
+                        HandoverPolicy(('alpha', 'beta'), 3, Fraction(2)))
+    bridged = plan_route(lake_path, version_id, route,
+                         HandoverPolicy(('alpha', 'beta', 'gamma'), 3, Fraction(2)))
+    return {
+        'version_id': version_id,
+        'direct': route_plan_record(direct),
+        'bridged': route_plan_record(bridged),
+    }
 
 
 def run_workday(lake_path, field_path, sources_path, workday_path):
@@ -90,9 +123,15 @@ def main(argv=None):
     init.add_argument('lake_path')
     init.add_argument('field_path')
     commands.add_parser('demo', help='运行一天的样例交班')
+    commands.add_parser('route-demo', help='演示路线交班与中间班组搭桥')
     args = parser.parse_args(argv)
     if args.command == 'init':
         initialize(args.lake_path, args.field_path)
+        return 0
+    if args.command == 'route-demo':
+        with TemporaryDirectory(prefix='estuary-route-') as directory:
+            print(json.dumps(route_scene(Path(directory)), ensure_ascii=False, indent=2,
+                             sort_keys=True))
         return 0
     with TemporaryDirectory(prefix='estuary-workday-') as directory:
         root = Path(directory)

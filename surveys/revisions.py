@@ -36,11 +36,16 @@ class SourceRevision:
     ref: RevisionRef
     source: str
     bounds: Rectangle
+    crew: str | None = None
 
     def __post_init__(self):
         if not isinstance(self.ref, RevisionRef) or not isinstance(self.bounds, Rectangle):
             raise ValueError('需要确切来源引用和矩形')
         require_text(self.source, '来源说明')
+        if self.crew is not None:
+            require_text(self.crew, '班组编号')
+            if self.ref.kind != 'footprint':
+                raise ValueError('只有测带修订可以带负责班组')
 
 
 def initialize_revisions(db):
@@ -51,20 +56,24 @@ def initialize_revisions(db):
             revision TEXT NOT NULL,
             source TEXT NOT NULL,
             bounds TEXT NOT NULL,
+            crew TEXT,
             PRIMARY KEY (kind, object_id, revision)
         )
     ''')
+    columns = {row[1] for row in db.execute('PRAGMA table_info(source_revisions)')}
+    if 'crew' not in columns:
+        db.execute('ALTER TABLE source_revisions ADD COLUMN crew TEXT')
 
 
 def load_revision(db, reference):
     row = db.execute('''
-        SELECT source, bounds FROM source_revisions
+        SELECT source, bounds, crew FROM source_revisions
         WHERE kind = ? AND object_id = ? AND revision = ?
     ''', reference.key).fetchone()
     if row is None:
         return None
-    source, bounds = row
-    return SourceRevision(reference, source, validate_bounds(json.loads(bounds)))
+    source, bounds, crew = row
+    return SourceRevision(reference, source, validate_bounds(json.loads(bounds)), crew)
 
 
 def store_revision(db, record):
@@ -74,7 +83,7 @@ def store_revision(db, record):
             raise ValueError(f'修订存在内容冲突 {record.ref.key!r}')
         return previous
     db.execute('''
-        INSERT INTO source_revisions (kind, object_id, revision, source, bounds)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (*record.ref.key, record.source, json.dumps(record.bounds.coordinates)))
+        INSERT INTO source_revisions (kind, object_id, revision, source, bounds, crew)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (*record.ref.key, record.source, json.dumps(record.bounds.coordinates), record.crew))
     return record

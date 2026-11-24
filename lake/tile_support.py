@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from lake.evidence import AcceptedTile
-from tiles.intersections import TileHit
+from tiles.intersections import FootprintCoverage, TileHit, ZoneExtent
 from tiles.packets import restore_packet
 
 
@@ -11,11 +11,14 @@ class TileContribution:
     source_round: str
     source_id: str
     hits: tuple[TileHit, ...]
+    coverage: tuple[FootprintCoverage, ...] = ()
+    zones: tuple[ZoneExtent, ...] = ()
 
 
 def _contribution(accepted: AcceptedTile):
     packet = accepted.packet
-    return TileContribution(packet.tile_id, packet.round_id, packet.source_id, packet.hits)
+    return TileContribution(packet.tile_id, packet.round_id, packet.source_id,
+                            packet.hits, packet.coverage, packet.zones)
 
 
 def compose_tile_support(plan, parent_support, accepted_tiles):

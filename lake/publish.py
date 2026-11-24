@@ -4,6 +4,7 @@ from dispatch.membership import build_membership
 from dispatch.net_changes import compute_net_changes
 from dispatch.origins import build_origin_index, resolve_delta_origins
 from dispatch.readback import DispatchSheet, store_dispatch_sheet
+from lake.coverage import store_version_coverage
 from lake.evidence import load_round_evidence
 from lake.tile_support import compose_tile_support, load_tile_support, store_tile_support
 from lake.versions import LakeVersion, find_round_publication, store_signed_version
@@ -47,5 +48,6 @@ def publish(lake_path, round_id):
         )
         store_signed_version(lake_db, version)
         store_tile_support(lake_db, version_id, current)
+        store_version_coverage(lake_db, version_id, current)
         store_dispatch_sheet(lake_db, sheet)
         return PublishResult(round_id, 'published', version_id)

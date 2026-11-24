@@ -7,7 +7,11 @@ from rounds.plans import get_round
 from rounds.tile_grid import resolve_tile_window
 from surveys.footprints import resolve_footprints
 from surveys.zones import resolve_zones
-from tiles.intersections import TileHit, compute_intersections, hit_from_record, hit_record
+from tiles.intersections import (
+    FootprintCoverage, TileHit, ZoneExtent, compute_coverage, compute_intersections,
+    compute_zone_extents, coverage_from_record, coverage_record, hit_from_record, hit_record,
+    zone_extent_from_record, zone_extent_record,
+)
 from tiles.staging import load_clearance, load_staged, save_staged
 from workdb import write_database
 
@@ -20,6 +24,8 @@ class TilePacket:
     binding: TileBinding
     hits: tuple[TileHit, ...]
     digest: str
+    coverage: tuple[FootprintCoverage, ...] = ()
+    zones: tuple[ZoneExtent, ...] = ()
 
     @property
     def tile_id(self):
@@ -37,6 +43,8 @@ def canonical_packet_bytes(packet):
         'parent_id': packet.parent_id,
         'binding': binding_record(packet.binding),
         'hits': [hit_record(hit) for hit in packet.hits],
+        'coverage': [coverage_record(piece) for piece in packet.coverage],
+        'zones': [zone_extent_record(piece) for piece in packet.zones],
     })
 
 
@@ -56,6 +64,8 @@ def restore_packet(body, digest):
         binding_from_record(record['binding']),
         tuple(hit_from_record(item) for item in record['hits']),
         digest,
+        tuple(coverage_from_record(item) for item in record.get('coverage', [])),
+        tuple(zone_extent_from_record(item) for item in record.get('zones', [])),
     )
     if packet_identity(packet) != digest:
         raise ValueError('存储件的内容摘要不符')
@@ -74,8 +84,12 @@ def seal_tile(lake_path, field_path, round_id, tile_id):
             return restore_packet(staged.body, staged.digest)
         footprints = resolve_footprints(field_db, binding.footprint_refs)
         zones = resolve_zones(field_db, binding.zone_refs)
-        hits = compute_intersections(resolve_tile_window(tile_id), footprints, zones)
-        content = TilePacket(source_id, round_id, plan.parent_id, binding, hits, '')
+        window = resolve_tile_window(tile_id)
+        hits = compute_intersections(window, footprints, zones)
+        coverage = compute_coverage(window, footprints)
+        extents = compute_zone_extents(window, zones)
+        content = TilePacket(source_id, round_id, plan.parent_id, binding, hits, '',
+                             coverage, extents)
         packet = replace(content, digest=packet_identity(content))
         save_staged(field_db, source_id, canonical_packet_bytes(packet), packet.digest)
         return packet

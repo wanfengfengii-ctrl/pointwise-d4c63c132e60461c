@@ -16,6 +16,7 @@ def make_zone_revision(object_id, revision, source, bounds):
     return SourceRevision(reference, source, validate_bounds(bounds))
 
 
+
 def resolve_zones(db, references):
     zones = []
     for reference in references:

@@ -9,11 +9,12 @@ class Footprint:
     reference: RevisionRef
     source: str
     bounds: Rectangle
+    crew: str | None = None
 
 
-def make_footprint_revision(object_id, revision, source, bounds):
+def make_footprint_revision(object_id, revision, source, bounds, crew=None):
     reference = RevisionRef('footprint', object_id, revision)
-    return SourceRevision(reference, source, validate_bounds(bounds))
+    return SourceRevision(reference, source, validate_bounds(bounds), crew)
 
 
 def resolve_footprints(db, references):
@@ -24,5 +25,5 @@ def resolve_footprints(db, references):
         record = load_revision(db, reference)
         if record is None:
             raise LookupError(f'缺少测带修订 {reference.key!r}')
-        footprints.append(Footprint(record.ref, record.source, record.bounds))
+        footprints.append(Footprint(record.ref, record.source, record.bounds, record.crew))
     return tuple(footprints)

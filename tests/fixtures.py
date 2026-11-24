@@ -46,9 +46,9 @@ class Workspace(unittest.TestCase):
         self.field = home / 'field.sqlite'
         initialize(self.lake, self.field)
 
-    def revision(self, kind, object_id, revision, bounds, source=None):
+    def revision(self, kind, object_id, revision, bounds, source=None, crew=None):
         return register(self.field, kind, object_id, revision,
-                        source or f'外业 {object_id} {revision}', bounds).ref
+                        source or f'外业 {object_id} {revision}', bounds, crew=crew).ref
 
     def plan(self, round_id, parent_id, assignments):
         return open_round(self.lake, self.field, round_id, parent_id, assignments)
