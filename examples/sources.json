@@ -1,0 +1,6 @@
+[
+  {"kind": "footprint", "object_id": "S", "revision": "r1", "source": "早班测带", "bounds": [2, 2, 8, 6]},
+  {"kind": "footprint", "object_id": "S", "revision": "r2", "source": "午班东移测带", "bounds": [12, 2, 18, 6]},
+  {"kind": "zone", "object_id": "A", "revision": "r1", "source": "岸边巡测区", "bounds": [4, 3, 16, 7]},
+  {"kind": "zone", "object_id": "B", "revision": "r1", "source": "堤外巡测区", "bounds": [13, 3, 19, 7]}
+]

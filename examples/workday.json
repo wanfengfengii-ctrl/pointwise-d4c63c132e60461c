@@ -1,0 +1,25 @@
+[
+  {
+    "round_id": "morning",
+    "assignments": {
+      "0,0": [["footprint", "S", "r1"], ["zone", "A", "r1"]],
+      "1,0": []
+    },
+    "delivery_order": ["1,0", "0,0"]
+  },
+  {
+    "round_id": "midday",
+    "assignments": {
+      "0,0": [["footprint", "S", "r2"], ["zone", "A", "r1"]],
+      "1,0": [["footprint", "S", "r2"], ["zone", "A", "r1"]]
+    },
+    "delivery_order": ["0,0", "1,0"]
+  },
+  {
+    "round_id": "evening",
+    "assignments": {
+      "1,0": [["footprint", "S", "r2"], ["zone", "B", "r1"]]
+    },
+    "delivery_order": ["1,0"]
+  }
+]
